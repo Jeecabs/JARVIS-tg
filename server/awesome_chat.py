@@ -24,6 +24,10 @@ from flask_cors import CORS
 from get_token_ids import get_token_ids_for_task_parsing, get_token_ids_for_choose_model, count_tokens, get_max_context_length
 from huggingface_hub.inference_api import InferenceApi
 from huggingface_hub.inference_api import ALL_TASKS
+from telegram import Update, ForceReply
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", type=str, default="config.yaml")
@@ -994,6 +998,27 @@ def server():
         return jsonify(response)
     waitress.serve(app, host=host, port=port)
 
+# Telegram related functionality
+def handle_message(update: Update, context: CallbackContext) -> None:
+    user_message = update.message.text
+    messages = [{"role": "user", "content": user_message}]
+    response = chat_huggingface(messages)
+    answer = response["message"]
+    update.message.reply_text(answer)
+
+def start_telegram_bot(token: str):
+    updater = Updater(token)
+
+    # Add handlers for commands and messages
+    updater.dispatcher.add_handler(CommandHandler("start", handle_message))
+    updater.dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
+
+
+
 if __name__ == "__main__":
     if args.mode == "test":
         test()
@@ -1001,3 +1026,6 @@ if __name__ == "__main__":
         server()
     elif args.mode == "cli":
         cli()
+    elif args.mode == "telegram_bot":
+        TELEGRAM_API_TOKEN = "your_telegram_api_token_here"
+        start_telegram_bot(TELEGRAM_API_TOKEN)
